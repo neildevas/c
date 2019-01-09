@@ -2,6 +2,8 @@ import { VOTE_UP, LOGIN_SUCCESS, QUEUE_REMOVE_TRACK, QUEUE_TRACK } from '../cons
 import { updateUsers } from '../actions/usersActions';
 import { updateQueue, queueEnded } from '../actions/queueActions';
 import { updateNowPlaying, playTrack } from '../actions/playbackActions';
+import { joinedRoom } from '../actions/roomActions';
+
 import Config from '../config/app';
 
 import io from 'socket.io-client';
@@ -83,6 +85,10 @@ export default function(store) {
 
   socket.on('update users', data => {
     store.dispatch(updateUsers(data));
+  });
+
+  socket.on('joinedRoom', roomId => {
+    store.dispatch(joinedRoom(roomId));
   });
 
   // todo: manage end song, end queue

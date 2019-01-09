@@ -66,10 +66,6 @@ nextApp.prepare().then(() => {
     req.locale = locale;
     req.localeDataScript = getLocaleDataScript(locale);
     req.messages = /*dev ? {} :*/ getMessages(locale);
-    console.log({
-      locale: req.locale,
-      messages: req.messages
-    });
     return nextHandler(req, res);
   });
 

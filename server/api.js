@@ -90,6 +90,7 @@ queueManager.init();
 const exportedApi = io => {
   let api = Router();
 
+  // TODO: preface all of these with the roomId
   api.get('/', (req, res) => {
     res.json({ version });
   });
@@ -150,15 +151,44 @@ const exportedApi = io => {
     });
 
     socket.on('user login', user => {
-      // todo: make request server-side to avoid tampering
       users.push({
         user: user,
         socket: socket.id
       });
       socket.user = user;
+      console.log('USER!!!!!!!', user);
+      // unique room per user
+      const roomId = user.id;
+      socket.roomId = roomId;
+      socket.join(roomId);
+      socket.emit('joinedRoom', roomId);
+
       socket.emit('update users', users.map(u => u.user));
       socket.broadcast.emit('update users', users.map(u => u.user));
 
+      // const queueManager = new QueueManager({
+      //   onPlay: (leader) => {
+      //     const playingContext = queueManager.getPlayingContext();
+      //     leader ? io.to(leader.id).emit('playTrack', playingContext.track) : io.to(roomName).emit('playTrack', playingContext.track); // server either tells only the leader or everyone to play the track
+      //     io.to(roomName).emit('nowPlaying', playingContext);
+      //   },
+      //   onQueueChanged: () => {
+      //     io.to(roomName).emit('updateQueue', queueManager.getQueue());
+      //   },
+      //   onQueueEnded: () => {
+      //     io.to(roomName).emit('updateQueue', queueManager.getQueue());
+      //   },
+      //   onPause: (leader) => {
+      //     io.to(leader.id).emit('pause');
+      //   },
+      //   onResume: (leader) => {
+      //     io.to(leader.id).emit('resume');
+      //   },
+      //   onRoomTypeChange: () => {
+      //     io.to(roomName).emit('roomTypeChanged', queueManager.getType());
+      //   },
+      //   leader: newUser,
+      // });
       // check if user should start playing something
       const playingContext = queueManager.getPlayingContext();
       if (playingContext.track !== null) {
@@ -173,6 +203,7 @@ const exportedApi = io => {
 
     socket.on('disconnect', () => {
       console.log('disconnect ' + socket.id);
+      console.log('I DISCONNECTED');
       let index = -1;
       users.forEach((user, i) => {
         if (user.socket === socket.id) {
