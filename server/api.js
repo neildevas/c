@@ -56,36 +56,10 @@ let users = [
   }
 ];
 
-let globalSocket = null;
+let allQueueManagers = {};
 
-const queueManager = new QueueManager({
-  onPlay: () => {
-    const { track, user } = queueManager.getPlayingContext();
-    globalSocket && globalSocket.emit('play track', track, user);
-    globalSocket && globalSocket.broadcast.emit('play track', track, user);
-  },
-  onQueueChanged: () => {
-    globalSocket && globalSocket.emit('update queue', queueManager.getQueue());
-    globalSocket && globalSocket.broadcast.emit('update queue', queueManager.getQueue());
-  },
-  onQueueEnded: async () => {
-    globalSocket && globalSocket.emit('update queue', queueManager.getQueue());
-    globalSocket && globalSocket.broadcast.emit('update queue', queueManager.getQueue());
-
-    const botRecommendation = await botUser.generateRecommendation(queueManager.playedHistory, getToken, spotifyApi);
-    if (botRecommendation !== null) {
-      queueManager.addItem(
-        new QueueItem({
-          track: botRecommendation,
-          user: botUser
-        }).toJSON()
-      );
-    }
-  }
-});
-
-queueManager.read();
-queueManager.init();
+// queueManager.read();
+// queueManager.init();
 
 const exportedApi = io => {
   let api = Router();
@@ -93,18 +67,6 @@ const exportedApi = io => {
   // TODO: preface all of these with the roomId
   api.get('/', (req, res) => {
     res.json({ version });
-  });
-
-  api.get('/now-playing', (req, res) => {
-    res.json(queueManager.playingContext);
-  });
-
-  api.get('/queue', (req, res) => {
-    res.json(queueManager.queue);
-  });
-
-  api.get('/users', (req, res) => {
-    res.json(users.map(u => u.user));
   });
 
   api.get('/me', async (req, res) => {
@@ -118,15 +80,32 @@ const exportedApi = io => {
     }
   });
 
+  api.get('/users', (req, res) => {
+    res.json(users.map(u => u.user));
+  });
+
+  api.use((req, res) => {
+    const roomId = req.params.roomId;
+    req.queueManager = allQueueManagers[roomId];
+  });
+
+  api.get('/:roomId/now-playing', (req, res) => {
+    res.json(req.queueManager.playingContext);
+  });
+
+  api.get('/:roomId/queue', (req, res) => {
+    res.json(req.queueManager.queue);
+  });
+
   // web socket interface!
   io.on('connection', socket => {
-    globalSocket = socket;
     socket.on('queue track', trackId => {
       console.log('queueing track ' + trackId);
       getToken(() => {
         spotifyApi
           .getTrack(trackId)
           .then(resApi => {
+            const queueManager = allQueueManagers[socket.roomId];
             queueManager.addItem(
               new QueueItem({
                 user: socket.user,
@@ -142,11 +121,13 @@ const exportedApi = io => {
 
     socket.on('vote up', id => {
       // todo: check that user is owner
+      const queueManager = allQueueManagers[socket.roomId];
       queueManager.voteUpId(socket.user, id);
     });
 
     socket.on('remove track', id => {
       // todo: check that user is owner
+      const queueManager = allQueueManagers[socket.roomId];
       queueManager.removeId(socket.user, id);
     });
 
@@ -156,7 +137,7 @@ const exportedApi = io => {
         socket: socket.id
       });
       socket.user = user;
-      console.log('USER!!!!!!!', user);
+
       // unique room per user
       const roomId = user.id;
       socket.roomId = roomId;
@@ -166,30 +147,35 @@ const exportedApi = io => {
       socket.emit('update users', users.map(u => u.user));
       socket.broadcast.emit('update users', users.map(u => u.user));
 
-      // const queueManager = new QueueManager({
-      //   onPlay: (leader) => {
-      //     const playingContext = queueManager.getPlayingContext();
-      //     leader ? io.to(leader.id).emit('playTrack', playingContext.track) : io.to(roomName).emit('playTrack', playingContext.track); // server either tells only the leader or everyone to play the track
-      //     io.to(roomName).emit('nowPlaying', playingContext);
-      //   },
-      //   onQueueChanged: () => {
-      //     io.to(roomName).emit('updateQueue', queueManager.getQueue());
-      //   },
-      //   onQueueEnded: () => {
-      //     io.to(roomName).emit('updateQueue', queueManager.getQueue());
-      //   },
-      //   onPause: (leader) => {
-      //     io.to(leader.id).emit('pause');
-      //   },
-      //   onResume: (leader) => {
-      //     io.to(leader.id).emit('resume');
-      //   },
-      //   onRoomTypeChange: () => {
-      //     io.to(roomName).emit('roomTypeChanged', queueManager.getType());
-      //   },
-      //   leader: newUser,
-      // });
-      // check if user should start playing something
+      const queueManager = new QueueManager({
+        onPlay: () => {
+          const { track, user } = queueManager.getPlayingContext();
+          io.to(roomId).emit('play track', track, user);
+        },
+        onQueueChanged: () => {
+          io.to(roomId).emit('update queue', queueManager.getQueue());
+        },
+        onQueueEnded: async () => {
+          io.to(roomId).emit('update queue', queueManager.getQueue());
+
+          const botRecommendation = await botUser.generateRecommendation(
+            queueManager.playedHistory,
+            getToken,
+            spotifyApi
+          );
+          if (botRecommendation !== null) {
+            queueManager.addItem(
+              new QueueItem({
+                track: botRecommendation,
+                user: botUser
+              }).toJSON()
+            );
+          }
+        }
+      });
+
+      allQueueManagers[roomId] = queueManager;
+
       const playingContext = queueManager.getPlayingContext();
       if (playingContext.track !== null) {
         socket.emit(

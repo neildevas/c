@@ -28,7 +28,8 @@ export default store => next => action => {
           } else {
             store.dispatch(fetchAvailableDevicesSuccess(r.devices));
           }
-        });
+        })
+        .catch(e => console.log(`Error: ${e}`));
       break;
     }
     case TRANSFER_PLAYBACK_TO_DEVICE: {
