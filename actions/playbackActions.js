@@ -25,7 +25,7 @@ export const fetchPlayingContextSuccess = playingContext => ({
   playingContext
 });
 
-export const fetchPlayingContext = () => dispatch =>
-  fetch(`${Config.HOST}/api/now-playing`)
+export const fetchPlayingContext = roomId => dispatch =>
+  fetch(`${Config.HOST}/api/${roomId}/now-playing`)
     .then(res => res.json())
     .then(res => dispatch(fetchPlayingContextSuccess(res)));

@@ -16,22 +16,23 @@ import { FormattedMessage } from 'react-intl';
 
 class Main extends React.Component {
   static getInitialProps({ req, store, isServer }) {
+    const roomId = store.getState().room.id;
     return Promise.all([
-      store.dispatch(fetchQueue()),
+      store.dispatch(fetchQueue(roomId)),
       store.dispatch(fetchUsers()),
-      store.dispatch(fetchPlayingContext())
+      store.dispatch(fetchPlayingContext(roomId))
     ]);
   }
   render() {
     return (
       <Layout>
-        {this.props.playing.track
-          ? <NowPlaying
-              track={this.props.playing.track}
-              user={this.props.playing.user}
-              position={this.props.playing.position}
-            />
-          : null}
+        {this.props.playing.track ? (
+          <NowPlaying
+            track={this.props.playing.track}
+            user={this.props.playing.user}
+            position={this.props.playing.position}
+          />
+        ) : null}
         <div className="app">
           <style jsx>
             {`

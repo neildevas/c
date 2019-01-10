@@ -84,17 +84,24 @@ const exportedApi = io => {
     res.json(users.map(u => u.user));
   });
 
-  api.use((req, res) => {
+  api.use((req, res, next) => {
     const roomId = req.params.roomId;
     req.queueManager = allQueueManagers[roomId];
+    next();
   });
 
   api.get('/:roomId/now-playing', (req, res) => {
-    res.json(req.queueManager.playingContext);
+    if (req.roomId) {
+      return res.json(req.queueManager.getPlayingContext());
+    }
+    res.json({});
   });
 
   api.get('/:roomId/queue', (req, res) => {
-    res.json(req.queueManager.queue);
+    if (req.roomId) {
+      return res.json(req.queueManager.getQueue());
+    }
+    res.json([]);
   });
 
   // web socket interface!

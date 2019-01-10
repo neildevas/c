@@ -11,5 +11,7 @@ export const queueRemoveTrack = id => ({
   id
 });
 
-export const fetchQueue = () => dispatch =>
-  fetch(`${Config.HOST}/api/queue`).then(res => res.json()).then(res => dispatch(updateQueue(res)));
+export const fetchQueue = roomId => dispatch =>
+  fetch(`${Config.HOST}/api/${roomId}/queue`)
+    .then(res => res.json())
+    .then(res => dispatch(updateQueue(res)));
