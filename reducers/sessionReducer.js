@@ -8,7 +8,9 @@ const initialState = {
 export default (state, action) => {
   switch (action.type) {
     case LOAD:
+      console.log('loading from reducer');
       if (process.browser) {
+        console.log('inside broswer');
         const refreshToken = localStorage.getItem('refreshToken');
         const accessToken = localStorage.getItem('accessToken');
         const expiresIn = localStorage.getItem('expiresIn');
@@ -18,6 +20,7 @@ export default (state, action) => {
           expires_in: expiresIn ? +expiresIn : null
         });
       } else {
+        console.log('returning state');
         return state;
       }
     case UPDATE_TOKEN_SUCCESS:

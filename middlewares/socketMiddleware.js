@@ -1,8 +1,8 @@
-import { VOTE_UP, LOGIN_SUCCESS, QUEUE_REMOVE_TRACK, QUEUE_TRACK } from '../constants/ActionTypes';
+import { VOTE_UP, LOGIN_SUCCESS, QUEUE_REMOVE_TRACK, QUEUE_TRACK, JOIN_ROOM } from '../constants/ActionTypes';
 import { updateUsers } from '../actions/usersActions';
-import { updateQueue, queueEnded } from '../actions/queueActions';
-import { updateNowPlaying, playTrack } from '../actions/playbackActions';
-import { joinedRoom } from '../actions/roomActions';
+import { updateQueue, queueEnded, fetchQueue } from '../actions/queueActions';
+import { updateNowPlaying, playTrack, fetchPlayingContext } from '../actions/playbackActions';
+import { joinedRoomSuccess } from '../actions/roomActions';
 
 import Config from '../config/app';
 
@@ -32,9 +32,11 @@ const getIdFromTrackString = (trackString = '') => {
 export function socketMiddleware(store) {
   return next => action => {
     const result = next(action);
-
     if (socket) {
       switch (action.type) {
+        case JOIN_ROOM:
+          socket.emit('joinRoom', action.id);
+          break;
         case QUEUE_TRACK: {
           let trackId = getIdFromTrackString(action.id);
           if (trackId === null) {
@@ -63,6 +65,7 @@ export function socketMiddleware(store) {
   };
 }
 export default function(store) {
+  console.log('connecting!');
   socket = io.connect(Config.HOST);
 
   socket.on('update queue', data => {
@@ -87,8 +90,11 @@ export default function(store) {
     store.dispatch(updateUsers(data));
   });
 
-  socket.on('joinedRoom', roomId => {
-    store.dispatch(joinedRoom(roomId));
+  socket.on('joinedRoomSuccess', roomId => {
+    console.log('JOINED ROOM!!!!');
+    store.dispatch(joinedRoomSuccess(roomId));
+    store.dispatch(fetchQueue(roomId));
+    store.dispatch(fetchPlayingContext(roomId));
   });
 
   // todo: manage end song, end queue

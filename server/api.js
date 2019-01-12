@@ -1,6 +1,7 @@
 const express = require('express');
 const fs = require('fs');
 const SpotifyWebApi = require('spotify-web-api-node');
+const _ = require('lodash');
 
 const AuthConfig = require('../config/auth');
 
@@ -58,9 +59,6 @@ let users = [
 
 let allQueueManagers = {};
 
-// queueManager.read();
-// queueManager.init();
-
 const exportedApi = io => {
   let api = Router();
 
@@ -84,22 +82,19 @@ const exportedApi = io => {
     res.json(users.map(u => u.user));
   });
 
-  api.use((req, res, next) => {
-    const roomId = req.params.roomId;
-    req.queueManager = allQueueManagers[roomId];
-    next();
-  });
-
   api.get('/:roomId/now-playing', (req, res) => {
-    if (req.roomId) {
-      return res.json(req.queueManager.getPlayingContext());
+    if (req.params.roomId) {
+      const queueManager = allQueueManagers[req.params.roomId];
+      return res.json(queueManager.getPlayingContext());
     }
     res.json({});
   });
 
   api.get('/:roomId/queue', (req, res) => {
-    if (req.roomId) {
-      return res.json(req.queueManager.getQueue());
+    console.log('fetching queue');
+    if (req.params.roomId) {
+      const queueManager = allQueueManagers[req.params.roomId];
+      return res.json(queueManager.getQueue());
     }
     res.json([]);
   });
@@ -145,46 +140,51 @@ const exportedApi = io => {
       });
       socket.user = user;
 
-      // unique room per user
-      const roomId = user.id;
-      socket.roomId = roomId;
-      socket.join(roomId);
-      socket.emit('joinedRoom', roomId);
-
       socket.emit('update users', users.map(u => u.user));
       socket.broadcast.emit('update users', users.map(u => u.user));
+    });
 
-      const queueManager = new QueueManager({
-        onPlay: () => {
-          const { track, user } = queueManager.getPlayingContext();
-          io.to(roomId).emit('play track', track, user);
-        },
-        onQueueChanged: () => {
-          io.to(roomId).emit('update queue', queueManager.getQueue());
-        },
-        onQueueEnded: async () => {
-          io.to(roomId).emit('update queue', queueManager.getQueue());
+    socket.on('joinRoom', id => {
+      console.log('Joining room with id', id);
+      socket.join(id);
+      socket.roomId = id;
+      socket.emit('joinedRoomSuccess', id);
 
-          const botRecommendation = await botUser.generateRecommendation(
-            queueManager.playedHistory,
-            getToken,
-            spotifyApi
-          );
-          if (botRecommendation !== null) {
-            queueManager.addItem(
-              new QueueItem({
-                track: botRecommendation,
-                user: botUser
-              }).toJSON()
+      if (!_.get(allQueueManagers, id, null)) {
+        console.log('Creating a queueManager for this room');
+        const queueManager = new QueueManager({
+          onPlay: () => {
+            const { track, user } = queueManager.getPlayingContext();
+            io.to(id).emit('play track', track, user);
+          },
+          onQueueChanged: () => {
+            io.to(id).emit('update queue', queueManager.getQueue());
+          },
+          onQueueEnded: async () => {
+            io.to(id).emit('update queue', queueManager.getQueue());
+
+            const botRecommendation = await botUser.generateRecommendation(
+              queueManager.playedHistory,
+              getToken,
+              spotifyApi
             );
+            if (botRecommendation !== null) {
+              queueManager.addItem(
+                new QueueItem({
+                  track: botRecommendation,
+                  user: botUser
+                }).toJSON()
+              );
+            }
           }
-        }
-      });
+        });
+        allQueueManagers[id] = queueManager;
+        return;
+      }
 
-      allQueueManagers[roomId] = queueManager;
-
+      const queueManager = allQueueManagers[id];
       const playingContext = queueManager.getPlayingContext();
-      if (playingContext.track !== null) {
+      if (playingContext.track != null) {
         socket.emit(
           'play track',
           playingContext.track,
@@ -196,7 +196,6 @@ const exportedApi = io => {
 
     socket.on('disconnect', () => {
       console.log('disconnect ' + socket.id);
-      console.log('I DISCONNECTED');
       let index = -1;
       users.forEach((user, i) => {
         if (user.socket === socket.id) {

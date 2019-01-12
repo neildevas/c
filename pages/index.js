@@ -16,11 +16,12 @@ import { FormattedMessage } from 'react-intl';
 
 class Main extends React.Component {
   static getInitialProps({ req, store, isServer }) {
+    console.log('about to do other shit!');
     const roomId = store.getState().room.id;
     return Promise.all([
-      store.dispatch(fetchQueue(roomId)),
-      store.dispatch(fetchUsers()),
-      store.dispatch(fetchPlayingContext(roomId))
+      // store.dispatch(fetchQueue(roomId)),
+      store.dispatch(fetchUsers())
+      // store.dispatch(fetchPlayingContext(roomId))
     ]);
   }
   render() {

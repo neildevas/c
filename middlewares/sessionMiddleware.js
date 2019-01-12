@@ -1,7 +1,8 @@
 import fetch from 'isomorphic-unfetch';
 
-import { LOAD, LOGIN } from '../constants/ActionTypes';
+import { LOAD, LOGIN, LOGIN_SUCCESS } from '../constants/ActionTypes';
 import { loginSuccess, updateCurrentUser, updateTokenSuccess } from '../actions/sessionActions';
+import { joinRoom } from '../actions/roomActions';
 
 import * as Config from '../config/app';
 
@@ -67,6 +68,7 @@ export default store => next => action => {
       break;
     }
     case LOGIN: {
+      console.log('ABOUT TO LOGIN');
       const getLoginURL = scopes => {
         return `${Config.HOST}/auth/login?scope=${encodeURIComponent(scopes.join(' '))}`;
       };
@@ -117,6 +119,8 @@ export default store => next => action => {
 
       break;
     }
+    case LOGIN_SUCCESS:
+      store.dispatch(joinRoom(store.getState().session.user.id));
     default:
       break;
   }
