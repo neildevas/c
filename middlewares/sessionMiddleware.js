@@ -42,6 +42,7 @@ export default store => next => action => {
   const result = next(action);
   switch (action.type) {
     case LOAD: {
+      console.log('LOADING!');
       const session = store.getState().session;
       const expiresIn = session.expires_in;
       const needsToUpdate = !expiresIn || expiresIn < Date.now() - 10 * 60 * 1000;

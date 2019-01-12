@@ -134,6 +134,13 @@ const exportedApi = io => {
     });
 
     socket.on('user login', user => {
+      let alreadyExists = false;
+      users.forEach(u => {
+        if (u.user.id === user.id) {
+          alreadyExists = true;
+        }
+      });
+      if (alreadyExists) return;
       users.push({
         user: user,
         socket: socket.id
